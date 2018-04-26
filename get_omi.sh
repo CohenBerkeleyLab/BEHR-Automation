@@ -104,7 +104,7 @@ do
         echo "File $fname exists"
         continue
     else
-        wget --load-cookies ~/.urs_cookies --save-cookies ~/.urs_cookies --auth-no-challenge=on --keep-session-cookies -nH -nd $f
+        wget --no-verbose --load-cookies ~/.urs_cookies --save-cookies ~/.urs_cookies --auth-no-challenge=on --keep-session-cookies -nH -nd $f
         mv $fname ../${y}/${m}/
     fi
     

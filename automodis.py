@@ -99,18 +99,22 @@ if __name__ == "__main__":
             fileIDs = server.searchForFiles(products=inargs["products"], startTime=inargs["startTime"], endTime=inargs["endTime"],
             north=inargs["north"], south=inargs["south"], east=inargs["east"], west=inargs["west"],
             coordsOrTiles=inargs["coordsOrTiles"], dayNightBoth=inargs["dayNightBoth"])
-        except:
+        except Exception as err:
             if attempt > 5:
                 print "More than five attempts failed to retrieve file IDs. Aborting."
                 raise
             else:
                 print "Retrieving file IDs failed, waiting 30 sec"
+                print "Message was:", str(err)
                 time.sleep(30)
         else:
             break
         finally:
             attempt += 1
     
+    if fileIDs == 'No results':
+        exit(2)
+
     print "fileIDs has length", len(fileIDs)
     fileIDs = ",".join(fileIDs) # returned as list, need as comma separated string
     
@@ -118,12 +122,13 @@ if __name__ == "__main__":
     while True:
         try:
             fileURLs = server.getFileUrls(fileIds=fileIDs)
-        except:
+        except Exception as err:
             if attempt > 5:
                 print "More than five attempts failed to retrieve file URLs. Aborting."
                 raise
             else:
-                print "Retrieving file IDs failed, waiting 30 sec"
+                print "Retrieving file URLs failed, waiting 30 sec"
+                print "Message was:", str(err)
                 time.sleep(30)
         else:
             break
@@ -132,6 +137,7 @@ if __name__ == "__main__":
     
     #fileURLs = "\n".join(fileURLs)
 
-    # Print to shell, will be set to variable if called appropriately
-    #sys.stdout.write(fileURLs)
+    # Write the URLs to a text file in the directory defined by the MATRUNDIR environmental
+    # variable
     write_urls(fileURLs)
+    exit(0)
