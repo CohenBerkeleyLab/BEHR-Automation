@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # This function will call into the MODAPS web services server
 # and retrieve a space delimited list of URLs to retrieve, which
@@ -41,7 +41,7 @@ def parse_args(args_in):
         else:
             raise IOError("{0} must be specified".format(a))
     
-    for a in opt_args.keys():
+    for a in list(opt_args.keys()):
         flag = "--" + a
         if flag in args_in:
             i = args_in.index(flag) + 1
@@ -72,7 +72,7 @@ def print_help(req_args, opt_args):
         sys.stdout.write(arg_str)
 
     sys.stdout.write("Optional arguments (with the default values ideal for BEHR listed):\n")
-    for arg in opt_args.keys():
+    for arg in list(opt_args.keys()):
         arg_str = "    --{0}    (def. value: {1})\n".format(arg, opt_args[arg])
         sys.stdout.write(arg_str)
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     #url = "http://modwebsrv.modaps.eosdis.nasa.gov/axis2/services/MODAPSservices"
     url = "https://modwebsrv.modaps.eosdis.nasa.gov/axis2/services/MODAPSservices"
     server = SOAPProxy(url)
-    print "Retrieving file IDs"
+    print("Retrieving file IDs")
     attempt=0
     while True:
         try:
@@ -101,11 +101,11 @@ if __name__ == "__main__":
             coordsOrTiles=inargs["coordsOrTiles"], dayNightBoth=inargs["dayNightBoth"])
         except Exception as err:
             if attempt > 5:
-                print "More than five attempts failed to retrieve file IDs. Aborting."
+                print("More than five attempts failed to retrieve file IDs. Aborting.")
                 raise
             else:
-                print "Retrieving file IDs failed, waiting 30 sec"
-                print "Message was:", str(err)
+                print("Retrieving file IDs failed, waiting 30 sec")
+                print("Message was:", str(err))
                 time.sleep(30)
         else:
             break
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     if fileIDs == 'No results':
         exit(2)
 
-    print "fileIDs has length", len(fileIDs)
+    print("fileIDs has length", len(fileIDs))
     fileIDs = ",".join(fileIDs) # returned as list, need as comma separated string
     
     attempt=0
@@ -124,11 +124,11 @@ if __name__ == "__main__":
             fileURLs = server.getFileUrls(fileIds=fileIDs)
         except Exception as err:
             if attempt > 5:
-                print "More than five attempts failed to retrieve file URLs. Aborting."
+                print("More than five attempts failed to retrieve file URLs. Aborting.")
                 raise
             else:
-                print "Retrieving file URLs failed, waiting 30 sec"
-                print "Message was:", str(err)
+                print("Retrieving file URLs failed, waiting 30 sec")
+                print("Message was:", str(err))
                 time.sleep(30)
         else:
             break
