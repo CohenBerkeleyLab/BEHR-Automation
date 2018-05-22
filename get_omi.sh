@@ -92,6 +92,7 @@ do
         m=${fdate:6:2}
     else
         (>&2 echo "Could not find data date in the filename $fname")
+        continue
     fi
 
     

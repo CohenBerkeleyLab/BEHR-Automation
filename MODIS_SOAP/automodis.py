@@ -81,10 +81,12 @@ def get_modis(products, collection, startTime, endTime, north=default_vals['nort
             attempt += 1
 
     if fileIDs == 'No results':
-        exit(2)
+        if output_file is None:
+            return
+        else:
+            exit(2)
 
     print("fileIDs has length", len(fileIDs))
-    pdb.set_trace()
     fileIDs = ",".join(fileIDs) # returned as list, need as comma separated string
 
     attempt=0
@@ -111,7 +113,7 @@ def get_modis(products, collection, startTime, endTime, north=default_vals['nort
     if output_file is not None:
         write_urls(fileURLs)
     else:
-        print(fileURLs)
+        return fileURLs
 
 
 if __name__ == '__main__':
