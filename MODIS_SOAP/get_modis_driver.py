@@ -31,7 +31,7 @@ def get_product_last_date(product, path, min_start_date=None):
     product_files = sorted(glob(os.path.join(last_year, '{}*'.format(product))))
     most_recent_file = os.path.basename(product_files[-1])
     most_recent_datestr = modis_date_re.search(most_recent_file).group()
-    return dt.datetime.strptime(most_recent_datestr, '%Y%j')
+    return min(dt.datetime.strptime(most_recent_datestr, '%Y%j'), min_start_date)
 
 
 def list_product_urls(product, collection, path, min_start_date=None):
