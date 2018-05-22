@@ -14,6 +14,8 @@ import pdb
 
 modis_date_re = re.compile('(?<=A)\d{7}')
 default_min_start_date = dt.datetime.today() - dt.timedelta(days=-90)
+behr_start_date = dt.datetime(2005, 1, 1)
+max_download_attempts = 10
 USERAGENT = 'tis/download.py_1.0--' + sys.version.replace('\n','').replace('\r','')
 
 def get_product_last_date(product, path, min_start_date=None):
@@ -26,12 +28,19 @@ def get_product_last_date(product, path, min_start_date=None):
         min_start_date = default_min_start_date
 
 
-    year_subdirs = sorted(glob(os.path.join(path, '20*')))
-    last_year = year_subdirs[-1]
-    product_files = sorted(glob(os.path.join(last_year, '{}*'.format(product))))
-    most_recent_file = os.path.basename(product_files[-1])
-    most_recent_datestr = modis_date_re.search(most_recent_file).group()
-    return min(dt.datetime.strptime(most_recent_datestr, '%Y%j'), min_start_date)
+    year_subdirs = reversed(sorted(glob(os.path.join(path, '20*'))))
+    for last_year in year_subdirs:
+        product_files = sorted(glob(os.path.join(last_year, '{}*'.format(product))))
+        if len(product_files) == 0:
+            continue
+
+        most_recent_file = os.path.basename(product_files[-1])
+        most_recent_datestr = modis_date_re.search(most_recent_file).group()
+        return min(dt.datetime.strptime(most_recent_datestr, '%Y%j'), min_start_date)
+
+    # If we don't find any files for the given product, we'd need to download all of those files from the beginning of
+    # the time period we process BEHR for.
+    return behr_start_date
 
 
 def list_product_urls(product, collection, path, min_start_date=None):
@@ -53,7 +62,7 @@ def get_earthdata_token():
                 return line.strip()
 
 
-def geturl(url, token=None, out=None):
+def geturl(url, token=None, out=None, verbose=0):
     """
     Retrieves a file from the MODIS LAADS server. Modified from
     https://ladsweb.modaps.eosdis.nasa.gov/tools-and-services/data-download-scripts/#python
@@ -61,55 +70,69 @@ def geturl(url, token=None, out=None):
     headers = { 'user-agent' : USERAGENT }
     if not token is None:
         headers['Authorization'] = 'Bearer ' + token
-    try:
-        import ssl
-        CTX = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        if sys.version_info.major == 2:
-            import urllib2
-            try:
-                fh = urllib2.urlopen(urllib2.Request(url, headers=headers), context=CTX)
-                if out is None:
-                    return fh.read()
-                else:
-                    shutil.copyfileobj(fh, out)
-            except urllib2.HTTPError as e:
-                print('HTTP GET error code: %d' % e.code, file=sys.stderr)
-                print('HTTP GET error message: %s' % e.message, file=sys.stderr)
-            except urllib2.URLError as e:
-                print('Failed to make request: %s' % e.reason, file=sys.stderr)
-            return None
+    safety = 0
+    while safety < max_download_attempts:
+        safety += 1
+        if safety > 0 and verbose > 0:
+            print('   Retrying download for {}'.format(url))
 
-        else:
-            from urllib.request import urlopen, Request, URLError, HTTPError
-            try:
-                fh = urlopen(Request(url, headers=headers), context=CTX)
-                if out is None:
-                    return fh.read().decode('utf-8')
-                else:
-                    shutil.copyfileobj(fh, out)
-            except HTTPError as e:
-                print('HTTP GET error code: %d' % e.code(), file=sys.stderr)
-                print('HTTP GET error message: %s' % e.message, file=sys.stderr)
-            except URLError as e:
-                print('Failed to make request: %s' % e.reason, file=sys.stderr)
-            return None
-
-    except AttributeError:
-        # OS X Python 2 and 3 don't support tlsv1.1+ therefore... curl
-        import subprocess
         try:
-            args = ['curl', '--fail', '-sS', '-L', '--get', url]
-            for (k,v) in headers.items():
-                args.extend(['-H', ': '.join([k, v])])
-            if out is None:
-                # python3's subprocess.check_output returns stdout as a byte string
-                result = subprocess.check_output(args)
-                return result.decode('utf-8') if isinstance(result, bytes) else result
+            import ssl
+            CTX = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            if sys.version_info.major == 2:
+                import urllib2
+                try:
+                    fh = urllib2.urlopen(urllib2.Request(url, headers=headers), context=CTX)
+                    if out is None:
+                        return fh.read()
+                    else:
+                        shutil.copyfileobj(fh, out)
+                except urllib2.HTTPError as e:
+                    print('HTTP GET error code: %d' % e.code, file=sys.stderr)
+                    print('HTTP GET error message: %s' % e.message, file=sys.stderr)
+                except urllib2.URLError as e:
+                    print('Failed to make request: %s' % e.reason, file=sys.stderr)
+                else:
+                    return None
+
             else:
-                subprocess.call(args, stdout=out)
-        except subprocess.CalledProcessError as e:
-            print('curl GET error message: %' + (e.message if hasattr(e, 'message') else e.output), file=sys.stderr)
-        return None
+                from urllib.request import urlopen, Request, URLError, HTTPError
+                try:
+                    fh = urlopen(Request(url, headers=headers), context=CTX)
+                    if out is None:
+                        return fh.read().decode('utf-8')
+                    else:
+                        shutil.copyfileobj(fh, out)
+                except HTTPError as e:
+                    print('HTTP GET error code: %d' % e.code(), file=sys.stderr)
+                    print('HTTP GET error message: %s' % e.message, file=sys.stderr)
+                except URLError as e:
+                    print('Failed to make request: %s' % e.reason, file=sys.stderr)
+                else:
+                    return None
+
+        except AttributeError:
+            # OS X Python 2 and 3 don't support tlsv1.1+ therefore... curl
+            # Not modified to try to redownload a failed file (JLL 22 May 2018)
+            import subprocess
+            try:
+                args = ['curl', '--fail', '-sS', '-L', '--get', url]
+                for (k,v) in headers.items():
+                    args.extend(['-H', ': '.join([k, v])])
+                if out is None:
+                    # python3's subprocess.check_output returns stdout as a byte string
+                    result = subprocess.check_output(args)
+                    return result.decode('utf-8') if isinstance(result, bytes) else result
+                else:
+                    subprocess.call(args, stdout=out)
+            except subprocess.CalledProcessError as e:
+                print('curl GET error message: %' + (e.message if hasattr(e, 'message') else e.output), file=sys.stderr)
+            return None
+
+    # If we get here, the download never completed successfully
+    raise RuntimeError('Number of download attempts for {} exceeded the maximum allowed {}'.format(
+        url, max_download_attempts
+    ))
 
 
 def download_product(product, collection, path, min_start_date=None, verbose=0):
@@ -133,7 +156,7 @@ def download_product(product, collection, path, min_start_date=None, verbose=0):
         with open(file_fullname, 'wb') as save_obj:
             if verbose > 0:
                 print('Downloading {} to {}'.format(link, os.path.join(year_directory, file_basename)))
-            geturl(link, token, save_obj)
+            geturl(link, token, save_obj, verbose=verbose)
 
 
 def main(min_start_date=None, verbose=0):
