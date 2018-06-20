@@ -13,12 +13,12 @@ import sys
 import pdb
 
 modis_date_re = re.compile('(?<=A)\d{7}')
-default_min_start_date = dt.datetime.today() - dt.timedelta(days=-90)
+default_min_start_date = dt.datetime.today() - dt.timedelta(days=90)
 behr_start_date = dt.datetime(2005, 1, 1)
 max_download_attempts = 10
 USERAGENT = 'tis/download.py_1.0--' + sys.version.replace('\n','').replace('\r','')
 
-def get_product_last_date(product, path, min_start_date=None):
+def get_product_last_date(product, path, min_start_date=None, verbose=0):
     """
     Searches the directory given by path to find yearly subdirectories and finds
     the most recent file for product, assuming that the files start with the
@@ -30,6 +30,8 @@ def get_product_last_date(product, path, min_start_date=None):
 
     year_subdirs = reversed(sorted(glob(os.path.join(path, '20*'))))
     for last_year in year_subdirs:
+        if verbose > 1:
+            print('Searching {}'.format(last_year))
         product_files = sorted(glob(os.path.join(last_year, '{}*'.format(product))))
         if len(product_files) == 0:
             continue
@@ -43,8 +45,8 @@ def get_product_last_date(product, path, min_start_date=None):
     return behr_start_date
 
 
-def list_product_urls(product, collection, path, min_start_date=None):
-    first_download_date = get_product_last_date(product, path, min_start_date=min_start_date) + dt.timedelta(days=1)
+def list_product_urls(product, collection, path, min_start_date=None, verbose=0):
+    first_download_date = get_product_last_date(product, path, min_start_date=min_start_date, verbose=verbose) + dt.timedelta(days=1)
     file_urls = am.get_modis(products=product, collection=collection, startTime=first_download_date.strftime('%Y-%m-%d %H:%M:%S'),
                              endTime=dt.datetime.today().strftime('%Y-%m-%d %H:%M:%S'), dayNightBoth='DB')
     if file_urls is None:
@@ -73,7 +75,7 @@ def geturl(url, token=None, out=None, verbose=0):
     safety = 0
     while safety < max_download_attempts:
         safety += 1
-        if safety > 0 and verbose > 0:
+        if safety > 1 and verbose > 0:
             print('   Retrying download for {}'.format(url))
 
         try:
@@ -137,7 +139,7 @@ def geturl(url, token=None, out=None, verbose=0):
 
 def download_product(product, collection, path, min_start_date=None, verbose=0):
     token = get_earthdata_token()
-    urls = list_product_urls(product, collection, path, min_start_date=min_start_date)
+    urls = list_product_urls(product, collection, path, min_start_date=min_start_date, verbose=verbose)
     for link in urls:
         file_datestr = modis_date_re.search(link).group()
         file_date = dt.datetime.strptime(file_datestr, '%Y%j')
@@ -159,12 +161,12 @@ def download_product(product, collection, path, min_start_date=None, verbose=0):
             geturl(link, token, save_obj, verbose=verbose)
 
 
-def main(min_start_date=None, verbose=0):
+def driver(min_start_date=None, verbose=0):
     modis_path = os.getenv('MODDIR')
     modis_alb_dir = os.path.join(modis_path, 'MCD43D')
     modis_cloud_dir = os.path.join(modis_path, 'MYD06_L2')
     modis_alb_collection = '6'
-    modis_cloud_collection = '6'
+    modis_cloud_collection = '61'
     products = [('MCD43D07', modis_alb_collection, modis_alb_dir),
                 ('MCD43D08', modis_alb_collection, modis_alb_dir),
                 ('MCD43D09', modis_alb_collection, modis_alb_dir),
@@ -194,6 +196,10 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-if __name__ == '__main__':
+def main():
     args_dict = parse_args()
-    main(**args_dict)
+    driver(**args_dict)
+
+
+if __name__ == '__main__':
+    main()

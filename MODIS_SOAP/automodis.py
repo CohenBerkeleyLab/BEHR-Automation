@@ -111,7 +111,7 @@ def get_modis(products, collection, startTime, endTime, north=default_vals['nort
     # Write the URLs to a text file in the directory defined by the MATRUNDIR environmental
     # variable
     if output_file is not None:
-        write_urls(fileURLs)
+        write_urls(fileURLs, output_file)
     else:
         return fileURLs
 
